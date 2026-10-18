@@ -1,5 +1,3 @@
-"""SLY scanner for the matrix language described in AGH compiler lab 1."""
-
 import argparse
 import sys
 from pathlib import Path

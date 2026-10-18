@@ -1,4 +1,8 @@
+"""SLY scanner for the matrix language described in AGH compiler lab 1."""
+
+import argparse
 import sys
+from pathlib import Path
 
 from sly import Lexer
 
@@ -34,28 +38,12 @@ class Scanner(Lexer):
         STRING,
     }
 
-    literals = {
-        "+",
-        "-",
-        "*",
-        "/",
-        "=",
-        "<",
-        ">",
-        "(",
-        ")",
-        "[",
-        "]",
-        "{",
-        "}",
-        ":",
-        "'",
-        ",",
-        ";",
-    }
-
+    literals = set("+-*/=<>()[]{}:',;")
     ignore = " \t"
-    ignore_comment = r"\#.*"
+    ignore_comment = r"\#[^\r\n]*"
+
+    # Compound operators precede lierals because SLY tries
+    # rules in their declaration order
 
     DOTADD = r"\.\+"
     DOTSUB = r"\.-"
@@ -85,29 +73,56 @@ class Scanner(Lexer):
     ID["ones"] = ONES
     ID["print"] = PRINT
 
-    FLOATNUM = r"(\d+\.\d*|\.\d+)([eE][+-]?\d+)?|\d+[eE][+-]?\d+"
-    INTNUM = r"\d+"
-    STRING = r'"([^"\\\n]|\\.)*"'
+    _DIGITS = r"[0-9]+"
+    _EXPONENT = rf"[eE][+-]?{_DIGITS}"
+    _POINT_FLOAT = rf"{_DIGITS}\.(?![+*/-])[0-9]*|\.{_DIGITS}"
+
+    FLOATNUM = rf"(?:{_POINT_FLOAT})(?:{_EXPONENT})?|{_DIGITS}{_EXPONENT}"
+    INTNUM = _DIGITS
+
+    _STRING_CHAR = r'[^"\\\r\n]'
+    _ESCAPE = r"\\[^\r\n]"
+    STRING = rf'"(?:{_STRING_CHAR}|{_ESCAPE})*"'
 
     @_(r"\n+")
     def ignore_newline(self, t):
         self.lineno += t.value.count("\n")
 
-    def error(self, t):
-        print(f"Line {self.lineno}: illegal character '{t.value[0]}'")
-        self.index += 1
+    def error(self, token):
+        line_start = self.text.rfind("\n", 0, token.index)
+        column = token.index - line_start
+
+        if token.value[0] == '"':
+            detail = "unterminated string"
+        else:
+            detail = f"illegal character {token.value[0]!r}"
+
+        raise ValueError(f"Line {token.lineno}, column {column}: {detail}")
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+
+    parser.add_argument(
+        "filename",
+        nargs="?",
+        type=Path,
+        default=Path(__file__).resolve().parent / "examples" / "example.txt",
+        help="source file (default: examples/example.txt beside scanner.py)",
+    )
+
+    args = parser.parse_args(argv)
+
+    try:
+        text = args.filename.read_text(encoding="utf-8")
+        for token in Scanner().tokenize(text):
+            print(f"({token.lineno}): {token.type}({token.value})")
+    except (OSError, UnicodeError, ValueError) as error:
+        print(error, file=sys.stderr)
+        return 1
+
+    return 0
 
 
 if __name__ == "__main__":
-    try:
-        filename = sys.argv[1] if len(sys.argv) > 1 else "example.txt"
-        file = open(filename, "r")
-    except IOError:
-        print("Cannot open {0} file".format(filename))
-        sys.exit(0)
-
-    text = file.read()
-    lexer = Scanner()
-
-    for tok in lexer.tokenize(text):
-        print(f"({tok.lineno}): {tok.type}({tok.value})")
+    sys.exit(main())

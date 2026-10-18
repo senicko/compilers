@@ -71,6 +71,9 @@ class Scanner(Lexer):
     ID["ones"] = ONES
     ID["print"] = PRINT
 
+    # To make the rules easier to read they are split into parts.
+    # SLY doesn't treat attributes prefixed with _ as parsing rules.
+
     _DIGITS = r"[0-9]+"
     _EXPONENT = rf"[eE][+-]?{_DIGITS}"
     _POINT_FLOAT = rf"{_DIGITS}\.(?![+*/-])[0-9]*|\.{_DIGITS}"
@@ -84,6 +87,7 @@ class Scanner(Lexer):
 
     @_(r"\n+")
     def ignore_newline(self, t):
+        # This is enough as reding in files in python changes all \r\n to \n
         self.lineno += t.value.count("\n")
 
     def error(self, token):
@@ -95,6 +99,7 @@ class Scanner(Lexer):
         else:
             detail = f"illegal character {token.value[0]!r}"
 
+        # Raising an error here ends the scanning after the first error.
         raise ValueError(f"Line {token.lineno}, column {column}: {detail}")
 
 

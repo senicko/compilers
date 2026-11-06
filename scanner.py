@@ -37,11 +37,14 @@ class Scanner(Lexer):
     }
 
     literals = set("+-*/=<>()[]{}:',;")
+
+    # SLY ignores everything that starts with `ignore_`
+
     ignore = " \t"
     ignore_comment = r"\#[^\r\n]*"
 
-    # Compound operators precede lierals because SLY tries
-    # rules in their declaration order
+    # Compound operators precede literals because SLY tries
+    # rules in their declaration order.
 
     DOTADD = r"\.\+"
     DOTSUB = r"\.-"
@@ -71,7 +74,6 @@ class Scanner(Lexer):
     ID["ones"] = ONES
     ID["print"] = PRINT
 
-    # To make the rules easier to read they are split into parts.
     # SLY doesn't treat attributes prefixed with _ as parsing rules.
 
     _DIGITS = r"[0-9]+"
@@ -85,13 +87,16 @@ class Scanner(Lexer):
     _ESCAPE = r"\\[^\r\n]"
     STRING = rf'"(?:{_STRING_CHAR}|{_ESCAPE})*"'
 
-    @_(r"\n+")
+    @_(r"\r\n|[\r\n]")
     def ignore_newline(self, t):
-        # This is enough as reding in files in python changes all \r\n to \n
-        self.lineno += t.value.count("\n")
+        # Obsługuje też tekst przekazany bezpośrednio do tokenize().
+        self.lineno += 1
 
     def error(self, token):
-        line_start = self.text.rfind("\n", 0, token.index)
+        line_start = max(
+            self.text.rfind("\n", 0, token.index),
+            self.text.rfind("\r", 0, token.index),
+        )
         column = token.index - line_start
 
         if token.value[0] == '"':
@@ -99,7 +104,6 @@ class Scanner(Lexer):
         else:
             detail = f"illegal character {token.value[0]!r}"
 
-        # Raising an error here ends the scanning after the first error.
         raise ValueError(f"Line {token.lineno}, column {column}: {detail}")
 
 
@@ -110,14 +114,14 @@ def main(argv=None):
         "filename",
         nargs="?",
         type=Path,
-        default=Path(__file__).resolve().parent / "examples" / "example.txt",
-        help="source file (default: examples/example.txt beside scanner.py)",
+        default=Path(__file__).resolve().parent / "examples" / "lab1" / "example.txt",
     )
 
     args = parser.parse_args(argv)
 
     try:
         text = args.filename.read_text(encoding="utf-8")
+
         for token in Scanner().tokenize(text):
             print(f"({token.lineno}): {token.type}({token.value})")
     except (OSError, UnicodeError, ValueError) as error:

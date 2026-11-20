@@ -1,12 +1,13 @@
 from sly import Parser
 
-from ast_nodes import Node
+import ast_nodes as ast
 from scanner import Scanner
 
 
 class Mparser(Parser):
     tokens = Scanner.tokens
     start = "program"
+    debugfile = "parser.out"
 
     # Od najniższego do najwyższego priorytetu.
     precedence = (
@@ -24,7 +25,7 @@ class Mparser(Parser):
 
     @_("statements")
     def program(self, p):
-        return Node("Program", p.statements)
+        return ast.Program(p.statements)
 
     @_("statements statement")
     def statements(self, p):
@@ -41,44 +42,48 @@ class Mparser(Parser):
 
     @_('PRINT expressions ";"')
     def statement(self, p):
-        return Node("Print", p.expressions)
+        return ast.Print(p.expressions)
 
-    @_('BREAK ";"', 'CONTINUE ";"')
+    @_('BREAK ";"')
     def statement(self, p):
-        return Node(p[0].capitalize())
+        return ast.Break()
+
+    @_('CONTINUE ";"')
+    def statement(self, p):
+        return ast.Continue()
 
     @_('RETURN expression ";"')
     def statement(self, p):
-        return Node("Return", [p.expression])
+        return ast.Return(p.expression)
 
     @_('RETURN ";"')
     def statement(self, p):
-        return Node("Return")
+        return ast.Return()
 
     @_('"{" statements "}"')
     def statement(self, p):
-        return Node("Block", p.statements)
+        return ast.Block(p.statements)
 
     # ELSE wiąże się z najbliższym IF, który nie ma jeszcze ELSE.
     @_('IF "(" expression ")" statement %prec IFX')
     def statement(self, p):
-        return Node("If", [p.expression, p.statement])
+        return ast.If(p.expression, p.statement)
 
     @_('IF "(" expression ")" statement ELSE statement')
     def statement(self, p):
-        return Node("If", [p.expression, p.statement0, p.statement1])
+        return ast.If(p.expression, p.statement0, p.statement1)
 
     @_('WHILE "(" expression ")" statement')
     def statement(self, p):
-        return Node("While", [p.expression, p.statement])
+        return ast.While(p.expression, p.statement)
 
     @_('FOR ID "=" range statement')
     def statement(self, p):
-        return Node("For", [Node("ID", value=p.ID), p.range, p.statement])
+        return ast.For(ast.Id(p.ID), p.range, p.statement)
 
     @_("reference assign_operator expression")
     def assignment(self, p):
-        return Node("Assign", [p.reference, p.expression], value=p.assign_operator)
+        return ast.Assign(p.reference, p.assign_operator, p.expression)
 
     @_('"="', "ADDASSIGN", "SUBASSIGN", "MULASSIGN", "DIVASSIGN")
     def assign_operator(self, p):
@@ -86,11 +91,11 @@ class Mparser(Parser):
 
     @_("ID")
     def reference(self, p):
-        return Node("ID", value=p.ID)
+        return ast.Id(p.ID)
 
     @_('ID "[" indices "]"')
     def reference(self, p):
-        return Node("Index", [Node("ID", value=p.ID), *p.indices])
+        return ast.Index(ast.Id(p.ID), p.indices)
 
     @_("index")
     def indices(self, p):
@@ -107,7 +112,7 @@ class Mparser(Parser):
 
     @_('expression ":" expression')
     def range(self, p):
-        return Node("Range", [p.expression0, p.expression1])
+        return ast.Range(p.expression0, p.expression1)
 
     @_(
         'expression "+" expression',
@@ -126,15 +131,15 @@ class Mparser(Parser):
         "expression NE expression",
     )
     def expression(self, p):
-        return Node("BinOp", [p.expression0, p.expression1], value=p[1])
+        return ast.BinOp(p[1], p.expression0, p.expression1)
 
     @_('"-" expression %prec UMINUS')
     def expression(self, p):
-        return Node("UnaryOp", [p.expression], value="-")
+        return ast.UnaryOp("-", p.expression)
 
     @_('expression "\'"')
     def expression(self, p):
-        return Node("Transpose", [p.expression])
+        return ast.Transpose(p.expression)
 
     @_('"(" expression ")"')
     def expression(self, p):
@@ -146,31 +151,31 @@ class Mparser(Parser):
 
     @_("INTNUM")
     def expression(self, p):
-        return Node("Int", value=p.INTNUM)
+        return ast.IntNum(p.INTNUM)
 
     @_("FLOATNUM")
     def expression(self, p):
-        return Node("Float", value=p.FLOATNUM)
+        return ast.FloatNum(p.FLOATNUM)
 
     @_("STRING")
     def expression(self, p):
-        return Node("String", value=p.STRING)
+        return ast.String(p.STRING)
 
     @_('"[" expressions "]"')
     def expression(self, p):
-        return Node("Array", p.expressions)
+        return ast.Array(p.expressions)
 
     @_('"[" "]"')
     def expression(self, p):
-        return Node("Array")
+        return ast.Array()
 
     @_('special_function "(" expression ")"')
     def expression(self, p):
-        return Node("Call", [p.expression], value=p.special_function)
+        return ast.Call(p.special_function, [p.expression])
 
     @_('special_function "(" expression "," expression ")"')
     def expression(self, p):
-        return Node("Call", [p.expression0, p.expression1], value=p.special_function)
+        return ast.Call(p.special_function, [p.expression0, p.expression1])
 
     @_("EYE", "ZEROS", "ONES")
     def special_function(self, p):
@@ -190,6 +195,7 @@ class Mparser(Parser):
             raise SyntaxError(
                 f"({self.scanner.lineno}): Błąd składni: nieoczekiwany koniec pliku"
             )
+
         raise SyntaxError(
             f"({token.lineno}): Błąd składni przy tokenie {token.type}({token.value!r})"
         )

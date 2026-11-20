@@ -2,15 +2,14 @@ import argparse
 import sys
 from pathlib import Path
 
-from ast_nodes import format_ast
 from parser import Mparser
 from scanner import Scanner
+from tree_printer import TreePrinter
 
 
 def main(argv=None) -> int:
-    arguments = argparse.ArgumentParser(
-        description="Parser języka macierzowego — lab. 2"
-    )
+    arguments = argparse.ArgumentParser()
+
     arguments.add_argument(
         "filename",
         nargs="?",
@@ -18,9 +17,11 @@ def main(argv=None) -> int:
         default=Path(__file__).resolve().parent / "examples" / "lab2" / "example1.m",
         help="plik z kodem źródłowym (domyślnie examples/lab2/example1.m)",
     )
+
     arguments.add_argument(
         "--ast", action="store_true", help="wypisz abstrakcyjne drzewo składniowe"
     )
+
     args = arguments.parse_args(argv)
 
     try:
@@ -33,7 +34,7 @@ def main(argv=None) -> int:
         return 1
 
     if args.ast:
-        print(format_ast(tree))
+        print(TreePrinter().format(tree))
     else:
         print("Kod jest poprawny składniowo.")
     return 0

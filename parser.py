@@ -9,11 +9,9 @@ class Mparser(Parser):
     start = "program"
     debugfile = "parser.out"
 
-    # Od najniższego do najwyższego priorytetu.
     precedence = (
         ("nonassoc", "IFX"),
         ("nonassoc", "ELSE"),
-        ("nonassoc", "<", ">", "LE", "GE", "EQ", "NE"),
         ("left", "+", "-", "DOTADD", "DOTSUB"),
         ("left", "*", "/", "DOTMUL", "DOTDIV"),
         ("right", "UMINUS"),
@@ -40,9 +38,9 @@ class Mparser(Parser):
     def statement(self, p):
         return p.assignment
 
-    @_('PRINT expressions ";"')
+    @_('PRINT values ";"')
     def statement(self, p):
-        return ast.Print(p.expressions)
+        return ast.Print(p.values)
 
     @_('BREAK ";"')
     def statement(self, p):
@@ -52,9 +50,9 @@ class Mparser(Parser):
     def statement(self, p):
         return ast.Continue()
 
-    @_('RETURN expression ";"')
+    @_('RETURN value ";"')
     def statement(self, p):
-        return ast.Return(p.expression)
+        return ast.Return(p.value)
 
     @_('RETURN ";"')
     def statement(self, p):
@@ -64,26 +62,36 @@ class Mparser(Parser):
     def statement(self, p):
         return ast.Block(p.statements)
 
-    # ELSE wiąże się z najbliższym IF, który nie ma jeszcze ELSE.
-    @_('IF "(" expression ")" statement %prec IFX')
+    @_('IF "(" condition ")" statement %prec IFX')
     def statement(self, p):
-        return ast.If(p.expression, p.statement)
+        return ast.If(p.condition, p.statement)
 
-    @_('IF "(" expression ")" statement ELSE statement')
+    @_('IF "(" condition ")" statement ELSE statement')
     def statement(self, p):
-        return ast.If(p.expression, p.statement0, p.statement1)
+        return ast.If(p.condition, p.statement0, p.statement1)
 
-    @_('WHILE "(" expression ")" statement')
+    @_('WHILE "(" condition ")" statement')
     def statement(self, p):
-        return ast.While(p.expression, p.statement)
+        return ast.While(p.condition, p.statement)
+
+    @_(
+        'expression "<" expression',
+        'expression ">" expression',
+        "expression LE expression",
+        "expression GE expression",
+        "expression EQ expression",
+        "expression NE expression",
+    )
+    def condition(self, p):
+        return ast.BinOp(p[1], p.expression0, p.expression1)
 
     @_('FOR ID "=" range statement')
     def statement(self, p):
         return ast.For(ast.Id(p.ID), p.range, p.statement)
 
-    @_("reference assign_operator expression")
+    @_("reference assign_operator value")
     def assignment(self, p):
-        return ast.Assign(p.reference, p.assign_operator, p.expression)
+        return ast.Assign(p.reference, p.assign_operator, p.value)
 
     @_('"="', "ADDASSIGN", "SUBASSIGN", "MULASSIGN", "DIVASSIGN")
     def assign_operator(self, p):
@@ -123,12 +131,6 @@ class Mparser(Parser):
         "expression DOTSUB expression",
         "expression DOTMUL expression",
         "expression DOTDIV expression",
-        'expression "<" expression',
-        'expression ">" expression',
-        "expression LE expression",
-        "expression GE expression",
-        "expression EQ expression",
-        "expression NE expression",
     )
     def expression(self, p):
         return ast.BinOp(p[1], p.expression0, p.expression1)
@@ -161,14 +163,6 @@ class Mparser(Parser):
     def expression(self, p):
         return ast.String(p.STRING)
 
-    @_('"[" expressions "]"')
-    def expression(self, p):
-        return ast.Array(p.expressions)
-
-    @_('"[" "]"')
-    def expression(self, p):
-        return ast.Array()
-
     @_('special_function "(" expression ")"')
     def expression(self, p):
         return ast.Call(p.special_function, [p.expression])
@@ -180,6 +174,40 @@ class Mparser(Parser):
     @_("EYE", "ZEROS", "ONES")
     def special_function(self, p):
         return p[0]
+
+    @_("expression", "matrix")
+    def value(self, p):
+        return p[0]
+
+    @_("value")
+    def values(self, p):
+        return [p.value]
+
+    @_('values "," value')
+    def values(self, p):
+        p.values.append(p.value)
+        return p.values
+
+    @_('"[" expressions "]"')
+    def matrix(self, p):
+        return ast.Array(p.expressions)
+
+    @_('"[" rows "]"')
+    def matrix(self, p):
+        return ast.Array(p.rows)
+
+    @_("vector")
+    def rows(self, p):
+        return [p.vector]
+
+    @_('rows "," vector')
+    def rows(self, p):
+        p.rows.append(p.vector)
+        return p.rows
+
+    @_('"[" expressions "]"')
+    def vector(self, p):
+        return ast.Array(p.expressions)
 
     @_("expression")
     def expressions(self, p):

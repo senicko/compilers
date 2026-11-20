@@ -3,10 +3,12 @@ from dataclasses import dataclass, field
 
 class Node:
     def accept(self, visitor, *args, **kwargs):
-        method = getattr(visitor, f"visit_{type(self).__name__}", None)
+        """Resolves the right accept method for self in visitor."""
+        name = f"visit_{type(self).__name__}"
+        method = getattr(visitor, name, None)
 
         if method is None:
-            method = visitor.generic_visit
+            raise NotImplementedError(f"{type(visitor).__name__} has no {name}")
 
         return method(self, *args, **kwargs)
 
@@ -15,10 +17,8 @@ class NodeVisitor:
     def visit(self, node: Node, *args, **kwargs):
         return node.accept(self, *args, **kwargs)
 
-    def generic_visit(self, node: Node, *args, **kwargs):
-        raise NotImplementedError(
-            f"{type(self).__name__} nie obsługuje węzła {type(node).__name__}"
-        )
+
+# Statements
 
 
 @dataclass
@@ -78,7 +78,7 @@ class For(Node):
     body: Node
 
 
-# Wyrażenia
+# Expressions
 
 
 @dataclass

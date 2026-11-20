@@ -34,7 +34,7 @@ def main(argv=None) -> int:
         return 1
 
     if args.ast:
-        print(TreePrinter().format(tree))
+        TreePrinter().visit(tree)
     else:
         print("Kod jest poprawny składniowo.")
     return 0

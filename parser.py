@@ -8,7 +8,7 @@ class Mparser(Parser):
     tokens = Scanner.tokens
     start = "program"
 
-    # Od najniższego do najwyższego priorytetu.
+    # lower => larger priority
     precedence = (
         ("nonassoc", "IFX"),
         ("nonassoc", "ELSE"),
